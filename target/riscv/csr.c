@@ -32,6 +32,17 @@
 #include "tcg/insn-start-words.h"
 #include "internals.h"
 
+static RISCVException r_qpr(CPURISCVState *env, int csrno, target_ulong *ret_val)
+{
+    *ret_val = env->qpr[0];
+    return RISCV_EXCP_NONE;
+}
+static RISCVException w_qpr(CPURISCVState *env, int csrno, target_ulong val, uintptr_t ra)
+{
+    env->qpr[0] = val;
+    return RISCV_EXCP_NONE;
+}
+
 /* CSR function table public API */
 void riscv_get_csr_ops(int csrno, riscv_csr_operations *ops)
 {
@@ -5805,6 +5816,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_FFLAGS]   = { "fflags",   fs,     read_fflags,  write_fflags },
     [CSR_FRM]      = { "frm",      fs,     read_frm,     write_frm    },
     [CSR_FCSR]     = { "fcsr",     fs,     read_fcsr,    write_fcsr   },
+    [CSR_QPR]     = { "qpr",     fs,     r_qpr,    w_qpr},
     /* Vector CSRs */
     [CSR_VSTART]   = { "vstart",   vs,     read_vstart,  write_vstart },
     [CSR_VXSAT]    = { "vxsat",    vs,     read_vxsat,   write_vxsat  },

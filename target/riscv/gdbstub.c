@@ -108,6 +108,28 @@ int riscv_cpu_gdb_write_register(CPUState *cs, uint8_t *mem_buf, int n)
     return length;
 }
 
+static int riscv_gdb_get_qpr(CPUState *cs, GByteArray *buf, int n)
+{
+    RISCVCPU *cpu = RISCV_CPU(cs);
+    CPURISCVState *env = &cpu->env;
+
+    if (n < 32)
+        return gdb_get_reg32(buf, env->qpr[n]);
+    return 0;
+}
+
+static int riscv_gdb_set_qpr(CPUState *cs, uint8_t *mem_buf, int n)
+{
+    RISCVCPU *cpu = RISCV_CPU(cs);
+    CPURISCVState *env = &cpu->env;
+
+    if (n < 32) {
+        env->qpr[n] = ldl_p(mem_buf);
+        return sizeof(target_ulong);
+    }
+    return 0;
+}
+
 static int riscv_gdb_get_fpu(CPUState *cs, GByteArray *buf, int n)
 {
     RISCVCPU *cpu = RISCV_CPU(cs);
@@ -346,6 +368,9 @@ void riscv_cpu_register_gdb_regs_for_features(CPUState *cs)
     RISCVCPUClass *mcc = RISCV_CPU_GET_CLASS(cs);
     RISCVCPU *cpu = RISCV_CPU(cs);
     CPURISCVState *env = &cpu->env;
+
+    gdb_register_coprocessor(cs, riscv_gdb_get_qpr, riscv_gdb_set_qpr, gdb_find_static_feature("riscv-32bit-qpr.xml"));
+
     if (env->misa_ext & RVD) {
         gdb_register_coprocessor(cs, riscv_gdb_get_fpu, riscv_gdb_set_fpu,
                                  gdb_find_static_feature("riscv-64bit-fpu.xml"));

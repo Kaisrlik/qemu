@@ -54,6 +54,8 @@
 #define CSR_FRM             0x002
 #define CSR_FCSR            0x003
 
+#define CSR_QPR            0x004
+
 /* User Vector CSRs */
 #define CSR_VSTART          0x008
 #define CSR_VXSAT           0x009

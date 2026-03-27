@@ -309,6 +309,10 @@ const char * const riscv_int_regnamesh[] = {
     "x30h/t5h",  "x31h/t6h"
 };
 
+const char * const riscv_qpr_regnames[] = {
+    "q0/qt0",   "q1/qt1",  "q2/qt2",   "q3/qt3"
+};
+
 const char * const riscv_fpr_regnames[] = {
     "f0/ft0",   "f1/ft1",  "f2/ft2",   "f3/ft3",   "f4/ft4",  "f5/ft5",
     "f6/ft6",   "f7/ft7",  "f8/fs0",   "f9/fs1",   "f10/fa0", "f11/fa1",
@@ -594,12 +598,21 @@ static void riscv_cpu_dump_state(CPUState *cs, FILE *f, int flags)
 #endif
 
     for (i = 0; i < 32; i++) {
-        qemu_fprintf(f, " %-8s " TARGET_FMT_lx,
+        qemu_fprintf(f, "a %-8s " TARGET_FMT_lx,
                      riscv_int_regnames[i], env->gpr[i]);
         if ((i & 3) == 3) {
             qemu_fprintf(f, "\n");
         }
     }
+
+    for (i = 0; i < 4; i++) {
+        qemu_fprintf(f, " %-8s " TARGET_FMT_lx, riscv_qpr_regnames[i], env->qpr[i]);
+        if ((i & 3) == 3) {
+            qemu_fprintf(f, "\n");
+        }
+    }
+
+
     if (flags & CPU_DUMP_FPU) {
         riscv_dump_csr(env, CSR_FFLAGS, f);
         riscv_dump_csr(env, CSR_FRM, f);

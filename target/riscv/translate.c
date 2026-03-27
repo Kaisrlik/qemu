@@ -40,6 +40,7 @@
 /* global register indices */
 static TCGv cpu_gpr[32], cpu_gprh[32], cpu_pc, cpu_vl, cpu_vstart;
 static TCGv_i64 cpu_fpr[32]; /* assume F and D extensions */
+static TCGv cpu_qpr[4];
 static TCGv load_res;
 static TCGv load_val;
 
@@ -1224,6 +1225,45 @@ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
 #include "insn_trans/trans_rvzcmop.c.inc"
 #include "insn_trans/trans_rvzicfiss.c.inc"
 
+// pico32rv specific instruction handling interrupts
+
+// Return from interrupt. This instruction copies the value from q0 to the
+// program counter and re-enables interrupts.
+static bool trans_retirq(DisasContext *ctx, arg_retirq *a)
+{
+    TCGv src1 = cpu_qpr[0];
+    gen_pc_plus_diff(src1, ctx, 0);
+    return true;
+}
+
+// The "IRQ Mask" register contains a bitmask of masked (disabled) interrupts.
+// This instruction writes a new value to the irq mask register and reads the
+// old value.
+static bool trans_maskirq(DisasContext *ctx, arg_maskirq *a)
+{
+    return true;
+}
+
+// Pause execution until an interrupt becomes pending. The bitmask of pending
+// IRQs is written to rd.
+static bool trans_waitirq(DisasContext *ctx, arg_waitirq *a)
+{
+    return true;
+}
+
+// This instruction copies the value from a general-purpose register to
+// a q-register.
+static bool trans_setq(DisasContext *ctx, arg_setq *a)
+{
+    return true;
+}
+// This instruction copies the value from a q-register to a general-purpose
+// register.
+static bool trans_getq(DisasContext *ctx, arg_getq *a)
+{
+    return true;
+}
+
 /* Include decoders for factored-out extensions */
 #include "decode-XVentanaCondOps.c.inc"
 
@@ -1465,6 +1505,9 @@ void riscv_translate_init(void)
     for (i = 0; i < 32; i++) {
         cpu_fpr[i] = tcg_global_mem_new_i64(tcg_env,
             offsetof(CPURISCVState, fpr[i]), riscv_fpr_regnames[i]);
+    }
+    for (i = 0; i < 4; i++) {
+        cpu_qpr[i] = tcg_global_mem_new(tcg_env, offsetof(CPURISCVState, qpr[i]), riscv_qpr_regnames[i]);
     }
 
     cpu_pc = tcg_global_mem_new(tcg_env, offsetof(CPURISCVState, pc), "pc");
