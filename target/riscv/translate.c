@@ -1255,12 +1255,18 @@ static bool trans_waitirq(DisasContext *ctx, arg_waitirq *a)
 // a q-register.
 static bool trans_setq(DisasContext *ctx, arg_setq *a)
 {
+    TCGv src = get_gpr(ctx, a->rs1, EXT_NONE);
+    TCGv dest = cpu_qpr[a->qd];
+    tcg_gen_mov_tl(dest, src);
     return true;
 }
 // This instruction copies the value from a q-register to a general-purpose
 // register.
 static bool trans_getq(DisasContext *ctx, arg_getq *a)
 {
+    TCGv dest = get_gpr(ctx, a->rd, EXT_NONE);
+    TCGv src = cpu_qpr[a->qs];
+    tcg_gen_mov_tl(dest, src);
     return true;
 }
 
