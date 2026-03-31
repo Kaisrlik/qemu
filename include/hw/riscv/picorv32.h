@@ -15,8 +15,8 @@ struct RISCVPicorv32State {
     /*< public >*/
     Notifier machine_done;
     DeviceState *platform_bus_dev;
-    RISCVHartArrayState soc[1];
-    DeviceState *irqchip[1];
+    RISCVHartArrayState soc;
+    DeviceState *irqchip;
     FWCfgState *fw_cfg;
 
     int fdt_size;
@@ -43,6 +43,7 @@ enum {
 
 #define PICORV32_PLATFORM_BUS_NUM_IRQS 32
 
+#define PICORV32_IRQ_VEC 0x10UL
 #define PICORV32_IRQCHIP_NUM_SOURCES 96
 #define PICORV32_IRQCHIP_NUM_PRIO_BITS 3
 

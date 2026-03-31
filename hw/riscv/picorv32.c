@@ -88,14 +88,14 @@ static void picorv32_machine_done(Notifier *notifier, void *data)
     hwaddr start_addr = s->memmap[PICORV32_DRAM].base;
     hwaddr firmware_end_addr;
     vaddr kernel_start_addr;
-    const char *firmware_name = riscv_default_firmware_name(&s->soc[0]);
+    const char *firmware_name = riscv_default_firmware_name(&s->soc);
     uint64_t fdt_load_addr;
     uint64_t kernel_entry = 0;
     RISCVBootInfo boot_info;
 
     firmware_end_addr = riscv_find_and_load_firmware(machine, firmware_name, &start_addr, NULL);
 
-    riscv_boot_info_init(&boot_info, &s->soc[0]);
+    riscv_boot_info_init(&boot_info, &s->soc);
 
     if (machine->kernel_filename && !kernel_entry) {
         kernel_start_addr = riscv_calc_kernel_start_addr(&boot_info, firmware_end_addr);
@@ -105,8 +105,15 @@ static void picorv32_machine_done(Notifier *notifier, void *data)
 
     fdt_load_addr = riscv_compute_fdt_addr(s->memmap[PICORV32_DRAM].base, s->memmap[PICORV32_DRAM].size, machine, &boot_info);
     /* load the reset vector */
-    riscv_setup_rom_reset_vec(machine, &s->soc[0], start_addr, s->memmap[PICORV32_MROM].base, s->memmap[PICORV32_MROM].size, kernel_entry, fdt_load_addr);
+    riscv_setup_rom_reset_vec(machine, &s->soc, start_addr, s->memmap[PICORV32_MROM].base, s->memmap[PICORV32_MROM].size, kernel_entry, fdt_load_addr);
     riscv_setup_direct_kernel(kernel_entry, fdt_load_addr);
+}
+
+static void picorv32_set_irqvec(void)
+{
+    CPUState *cs = qemu_get_cpu(0);
+    CPURISCVState *env = &RISCV_CPU(cs)->env;
+    env->mtvec = PICORV32_IRQ_VEC;
 }
 
 static void picorv32_machine_init(MachineState *machine)
@@ -116,23 +123,26 @@ static void picorv32_machine_init(MachineState *machine)
     MemoryRegion *system_memory = get_system_memory();
     MemoryRegion *mask_rom = g_new(MemoryRegion, 1);
     DeviceState *mmio_irqchip;
-    int i = 0;
+    uint32_t hid = 0, num_harts = 1;
 
     s->memmap = picorv32_memmap;
 
     /* Initialize sockets */
     mmio_irqchip = NULL;
-    g_autofree char *soc_name = g_strdup_printf("soc%d", i);
+    object_initialize_child(OBJECT(machine), "soc0", &s->soc, TYPE_RISCV_HART_ARRAY);
+    object_property_set_uint(OBJECT(&s->soc), "hartid-base", hid, &error_abort);
+    object_property_set_uint(OBJECT(&s->soc), "num-harts", num_harts, &error_abort);
+    object_property_set_str(OBJECT(&s->soc), "cpu-type", machine->cpu_type, &error_abort);
+    object_property_set_uint(OBJECT(&s->soc), "resetvec", s->memmap[PICORV32_MROM].base, &error_abort);
 
-    object_initialize_child(OBJECT(machine), soc_name, &s->soc[i], TYPE_RISCV_HART_ARRAY);
-    object_property_set_str(OBJECT(&s->soc[i]), "cpu-type", machine->cpu_type, &error_abort);
-    object_property_set_uint(OBJECT(&s->soc[i]), "resetvec", s->memmap[PICORV32_MROM].base, &error_abort);
-
-    sysbus_realize(SYS_BUS_DEVICE(&s->soc[i]), &error_fatal);
+    sysbus_realize(SYS_BUS_DEVICE(&s->soc), &error_fatal);
 
     /* Per-socket interrupt controller */
-    s->irqchip[i] = picorv32_create_plic(s->memmap, i, 0, 1);
-    mmio_irqchip = s->irqchip[i];
+    s->irqchip = picorv32_create_plic(s->memmap, 0, hid, num_harts);
+    mmio_irqchip = s->irqchip;
+
+    /* Set irq vector address in mtvec */
+    picorv32_set_irqvec();
 
     /* register system main memory (actual RAM) */
     memory_region_add_subregion(system_memory, s->memmap[PICORV32_DRAM].base,
