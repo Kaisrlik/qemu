@@ -1231,8 +1231,43 @@ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
 // program counter and re-enables interrupts.
 static bool trans_retirq(DisasContext *ctx, arg_retirq *a)
 {
-    TCGv src1 = cpu_qpr[0];
-    gen_pc_plus_diff(src1, ctx, 0);
+    // TODO: we may need to modify size of imm
+    int imm = 8;
+    int rd = 0x0;
+    TCGLabel *misaligned = NULL;
+    TCGv target_pc = tcg_temp_new();
+    TCGv succ_pc = dest_gpr(ctx, rd);
+
+    // Basic program stores return address in q1, this may need to be changed to
+    // follow documentation
+    tcg_gen_addi_tl(target_pc, cpu_qpr[1], imm);
+    tcg_gen_andi_tl(target_pc, target_pc, (target_ulong)-2);
+
+    if (get_xl(ctx) == MXL_RV32) {
+        tcg_gen_ext32s_tl(target_pc, target_pc);
+    }
+
+    if (!riscv_cpu_allow_16bit_insn(ctx->cfg_ptr,
+                                    ctx->priv_ver,
+                                    ctx->misa_ext)) {
+        TCGv t0 = tcg_temp_new();
+
+        misaligned = gen_new_label();
+        tcg_gen_andi_tl(t0, target_pc, 0x2);
+        tcg_gen_brcondi_tl(TCG_COND_NE, t0, 0x0, misaligned);
+    }
+
+    gen_pc_plus_diff(succ_pc, ctx, ctx->cur_insn_len);
+    gen_set_gpr(ctx, rd, succ_pc);
+
+    tcg_gen_mov_tl(cpu_pc, target_pc);
+    lookup_and_goto_ptr(ctx);
+
+    if (misaligned) {
+        gen_set_label(misaligned);
+        gen_exception_inst_addr_mis(ctx, target_pc);
+    }
+    ctx->base.is_jmp = DISAS_NORETURN;
     return true;
 }
 
