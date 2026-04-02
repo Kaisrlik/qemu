@@ -14,6 +14,9 @@
 #include "system/device_tree.h"
 #include "system/system.h"
 
+// Devices
+#include "hw/misc/simple_irq_gen.h"
+
 #define log(fmt, ...) qemu_log_mask(LOG_GUEST_ERROR, "%s: " fmt, __func__, ##__VA_ARGS__)
 
 
@@ -166,6 +169,20 @@ static void picorv32_machine_init(MachineState *machine)
     serial_mm_init(system_memory, s->memmap[PICORV32_UART0].base,
         0, qdev_get_gpio_in(mmio_irqchip, UART0_IRQ), 399193,
         serial_hd(0), DEVICE_LITTLE_ENDIAN);
+
+
+#define SIMPLE_IRQ_GEN_BASE  0x10001000
+#define SIMPLE_IRQ_GEN_IRQ   16
+
+    // Create simple IRQ generator
+    DeviceState *irq_gen = qdev_new(TYPE_SIMPLE_IRQ);
+    qdev_prop_set_uint32(irq_gen, "default-interval", 2000); // 2 seconds
+    sysbus_realize_and_unref(SYS_BUS_DEVICE(irq_gen), &error_fatal);
+    // Map to memory
+    sysbus_mmio_map(SYS_BUS_DEVICE(irq_gen), 0, SIMPLE_IRQ_GEN_BASE);
+    // Connect to interrupt controller
+    sysbus_connect_irq(SYS_BUS_DEVICE(irq_gen), 0, qdev_get_gpio_in(mmio_irqchip, SIMPLE_IRQ_GEN_IRQ));
+    printf("Simple IRQ Generator mapped at 0x%08x, IRQ %d\n", SIMPLE_IRQ_GEN_BASE, SIMPLE_IRQ_GEN_IRQ);
 
     ms->fdt = create_device_tree(&s->fdt_size);
 
