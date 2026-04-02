@@ -257,6 +257,14 @@ static void gen_update_pc(DisasContext *ctx, target_long diff)
 
 static void generate_exception(DisasContext *ctx, RISCVException excp)
 {
+    TCGv ra = cpu_gpr[1];
+    TCGv q0 = cpu_qpr[0];
+    TCGv q1 = cpu_qpr[1];
+    // Set return address in q0
+    tcg_gen_mov_tl(q0, ra);
+    // Set irq flag EBREAK, ECALL
+    tcg_gen_ori_tl(q1, q1, 1 << 1);
+
     gen_update_pc(ctx, 0);
     gen_helper_raise_exception(tcg_env, tcg_constant_i32(excp));
     ctx->base.is_jmp = DISAS_NORETURN;
@@ -1237,11 +1245,14 @@ static bool trans_retirq(DisasContext *ctx, arg_retirq *a)
     TCGLabel *misaligned = NULL;
     TCGv target_pc = tcg_temp_new();
     TCGv succ_pc = dest_gpr(ctx, rd);
+    TCGv zero = ctx->zero;
 
     // Basic program stores return address in q1, this may need to be changed to
     // follow documentation
-    tcg_gen_addi_tl(target_pc, cpu_qpr[1], imm);
+    tcg_gen_addi_tl(target_pc, cpu_qpr[0], imm);
     tcg_gen_andi_tl(target_pc, target_pc, (target_ulong)-2);
+    // Clean up q1
+    tcg_gen_addi_tl(cpu_qpr[1], zero, 0);
 
     if (get_xl(ctx) == MXL_RV32) {
         tcg_gen_ext32s_tl(target_pc, target_pc);
