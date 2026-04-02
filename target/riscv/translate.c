@@ -261,7 +261,8 @@ static void generate_exception(DisasContext *ctx, RISCVException excp)
     TCGv q0 = cpu_qpr[0];
     TCGv q1 = cpu_qpr[1];
     // Set return address in q0
-    tcg_gen_mov_tl(q0, ra);
+    uint32_t insn_len = ((ctx->opcode & 0x3) != 0x3) ? 2 : 4;
+    tcg_gen_addi_tl(q0, ra, insn_len);
     // Set irq flag EBREAK, ECALL
     tcg_gen_ori_tl(q1, q1, 1 << 1);
 
@@ -1239,8 +1240,6 @@ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
 // program counter and re-enables interrupts.
 static bool trans_retirq(DisasContext *ctx, arg_retirq *a)
 {
-    // TODO: we may need to modify size of imm
-    int imm = 8;
     int rd = 0x0;
     TCGLabel *misaligned = NULL;
     TCGv target_pc = tcg_temp_new();
@@ -1249,7 +1248,7 @@ static bool trans_retirq(DisasContext *ctx, arg_retirq *a)
 
     // Basic program stores return address in q1, this may need to be changed to
     // follow documentation
-    tcg_gen_addi_tl(target_pc, cpu_qpr[0], imm);
+    tcg_gen_addi_tl(target_pc, cpu_qpr[0], 0);
     tcg_gen_andi_tl(target_pc, target_pc, (target_ulong)-2);
     // Clean up q1
     tcg_gen_addi_tl(cpu_qpr[1], zero, 0);
