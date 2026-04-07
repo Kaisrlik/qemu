@@ -139,6 +139,13 @@ static void simple_irq_realize(DeviceState *dev, Error **errp)
     s->timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, simple_irq_timer_cb, s);
 
     qemu_log("SimpleIRQ: Device realized\n");
+
+    // Trigger irq after some time
+    s->irq_enabled = true;
+    s->timer_enabled = true;
+    s->status |= STATUS_TIMER_ACTIVE;
+    timer_mod(s->timer, qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + s->interval * 1000000ULL);
+    qemu_log("SimpleIRQ: Timer started with interval %u ms\n", s->interval);
 }
 
 static const Property simple_irq_properties[] = {

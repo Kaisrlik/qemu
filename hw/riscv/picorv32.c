@@ -37,7 +37,7 @@ static FWCfgState *create_fw_cfg(const MachineState *ms, hwaddr base)
     return fw_cfg;
 }
 
-static void create_platform_bus(RISCVPicorv32State *s, DeviceState *irqchip)
+static void __attribute__((unused)) create_platform_bus(RISCVPicorv32State *s, DeviceState *irqchip)
 {
     DeviceState *dev;
     SysBusDevice *sysbus;
@@ -119,12 +119,6 @@ static void picorv32_machine_init(MachineState *machine)
 
     sysbus_realize(SYS_BUS_DEVICE(&s->soc), &error_fatal);
 
-    /* Per-socket interrupt controller */
-    s->irqchip = riscv_aplic_create(s->memmap[PICORV32_APLIC_M].base,
-            s->memmap[PICORV32_APLIC_M].size, hid, num_harts,
-            PICORV32_IRQCHIP_NUM_SOURCES, PICORV32_IRQCHIP_NUM_PRIO_BITS, true,
-            true, NULL);
-
     /* Set irq vector address in mtvec */
     picorv32_set_irqvec();
 
@@ -145,12 +139,6 @@ static void picorv32_machine_init(MachineState *machine)
     s->fw_cfg = create_fw_cfg(machine, s->memmap[PICORV32_FW_CFG].base);
     rom_set_fw(s->fw_cfg);
 
-    create_platform_bus(s, s->irqchip);
-
-    serial_mm_init(system_memory, s->memmap[PICORV32_UART0].base,
-        0, qdev_get_gpio_in(s->irqchip, UART0_IRQ), 399193,
-        serial_hd(0), DEVICE_LITTLE_ENDIAN);
-
 #define SIMPLE_IRQ_GEN_BASE  0x10001000
 #define SIMPLE_IRQ_GEN_IRQ   16
     // Create simple IRQ generator
@@ -160,8 +148,29 @@ static void picorv32_machine_init(MachineState *machine)
     // Map to memory
     sysbus_mmio_map(SYS_BUS_DEVICE(irq_gen), 0, SIMPLE_IRQ_GEN_BASE);
     // Connect to interrupt controller
+
+    // PLIC vs. RNMI interrupt controller
+#if 0
+    /* Per-socket interrupt controller */
+    s->irqchip = riscv_aplic_create(s->memmap[PICORV32_APLIC_M].base,
+            s->memmap[PICORV32_APLIC_M].size, hid, num_harts,
+            PICORV32_IRQCHIP_NUM_SOURCES, PICORV32_IRQCHIP_NUM_PRIO_BITS, true,
+            true, NULL);
+    create_platform_bus(s, s->irqchip);
+
+    serial_mm_init(system_memory, s->memmap[PICORV32_UART0].base,
+        0, qdev_get_gpio_in(s->irqchip, UART0_IRQ), 399193,
+        serial_hd(0), DEVICE_LITTLE_ENDIAN);
+
     sysbus_connect_irq(SYS_BUS_DEVICE(irq_gen), 0, qdev_get_gpio_in(s->irqchip, SIMPLE_IRQ_GEN_IRQ));
-    printf("Simple IRQ Generator mapped at 0x%08x, IRQ %d\n", SIMPLE_IRQ_GEN_BASE, SIMPLE_IRQ_GEN_IRQ);
+#else
+    CPUState *cs = qemu_get_cpu(0);
+    qemu_irq rnmi_irq = qdev_get_gpio_in_named(DEVICE(cs), "riscv.cpu.rnmi", 11);
+    serial_mm_init(system_memory, s->memmap[PICORV32_UART0].base, 0, NULL, 115200, serial_hd(0), DEVICE_LITTLE_ENDIAN);
+
+    rnmi_irq = qdev_get_gpio_in_named(DEVICE(cs), "riscv.cpu.rnmi", 12);
+    sysbus_connect_irq(SYS_BUS_DEVICE(irq_gen), 0, rnmi_irq);
+#endif
 
     ms->fdt = create_device_tree(&s->fdt_size);
 
