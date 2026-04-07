@@ -8,7 +8,7 @@
 #include "hw/riscv/picorv32.h"
 #include "hw/riscv/boot.h"
 #include "kvm/kvm_riscv.h"
-#include "hw/intc/sifive_plic.h"
+#include "hw/intc/riscv_aplic.h"
 #include "hw/core/platform-bus.h"
 #include "chardev/char.h"
 #include "system/device_tree.h"
@@ -24,7 +24,7 @@ static const MemMapEntry picorv32_memmap[] = {
     [PICORV32_DRAM] =         {        0x0,     0x1000000 },
     [PICORV32_MROM] =         {  0x1000000,        0xf000 },
     [PICORV32_PLATFORM_BUS] = {  0x4000000,     0x2000000 },
-    [PICORV32_PLIC] =         {  0xc000000, PICORV32_PLIC_SIZE(2) },
+    [PICORV32_APLIC_M] =      {  0xd000000, APLIC_SIZE(2) },
     [PICORV32_UART0] =        { 0x10000000,         0x100 },
     [PICORV32_FW_CFG] =       { 0x10100000,          0x18 },
 };
@@ -120,10 +120,10 @@ static void picorv32_machine_init(MachineState *machine)
     sysbus_realize(SYS_BUS_DEVICE(&s->soc), &error_fatal);
 
     /* Per-socket interrupt controller */
-    s->irqchip = sifive_plic_create(s->memmap[PICORV32_PLIC].base, hmode, num_harts, hid,
-             PICORV32_IRQCHIP_NUM_SOURCES, ((1U << PICORV32_IRQCHIP_NUM_PRIO_BITS) - 1),
-             PICORV32_PLIC_PRIORITY_BASE, PICORV32_PLIC_PENDING_BASE, PICORV32_PLIC_ENABLE_BASE, PICORV32_PLIC_ENABLE_STRIDE,
-             PICORV32_PLIC_CONTEXT_BASE, PICORV32_PLIC_CONTEXT_STRIDE, s->memmap[PICORV32_PLIC].size);
+    s->irqchip = riscv_aplic_create(s->memmap[PICORV32_APLIC_M].base,
+            s->memmap[PICORV32_APLIC_M].size, hid, num_harts,
+            PICORV32_IRQCHIP_NUM_SOURCES, PICORV32_IRQCHIP_NUM_PRIO_BITS, true,
+            true, NULL);
 
     /* Set irq vector address in mtvec */
     picorv32_set_irqvec();
@@ -150,7 +150,6 @@ static void picorv32_machine_init(MachineState *machine)
     serial_mm_init(system_memory, s->memmap[PICORV32_UART0].base,
         0, qdev_get_gpio_in(s->irqchip, UART0_IRQ), 399193,
         serial_hd(0), DEVICE_LITTLE_ENDIAN);
-
 
 #define SIMPLE_IRQ_GEN_BASE  0x10001000
 #define SIMPLE_IRQ_GEN_IRQ   16
