@@ -37,27 +37,6 @@ static FWCfgState *create_fw_cfg(const MachineState *ms, hwaddr base)
     return fw_cfg;
 }
 
-static DeviceState *picorv32_create_plic(const MemMapEntry *memmap, int socket,
-                                     int base_hartid, int hart_count)
-{
-    g_autofree char *plic_hart_config = NULL;
-
-    /* Per-socket PLIC hart topology configuration string */
-    plic_hart_config = riscv_plic_hart_config_string(hart_count);
-
-    /* Per-socket PLIC */
-    return sifive_plic_create(
-             memmap[PICORV32_PLIC].base + socket * memmap[PICORV32_PLIC].size,
-             plic_hart_config, hart_count, base_hartid,
-             PICORV32_IRQCHIP_NUM_SOURCES,
-             ((1U << PICORV32_IRQCHIP_NUM_PRIO_BITS) - 1),
-             PICORV32_PLIC_PRIORITY_BASE, PICORV32_PLIC_PENDING_BASE,
-             PICORV32_PLIC_ENABLE_BASE, PICORV32_PLIC_ENABLE_STRIDE,
-             PICORV32_PLIC_CONTEXT_BASE,
-             PICORV32_PLIC_CONTEXT_STRIDE,
-             memmap[PICORV32_PLIC].size);
-}
-
 static void create_platform_bus(RISCVPicorv32State *s, DeviceState *irqchip)
 {
     DeviceState *dev;
@@ -125,13 +104,13 @@ static void picorv32_machine_init(MachineState *machine)
     MachineState *ms = MACHINE(s);
     MemoryRegion *system_memory = get_system_memory();
     MemoryRegion *mask_rom = g_new(MemoryRegion, 1);
-    DeviceState *mmio_irqchip;
     uint32_t hid = 0, num_harts = 1;
+    char hmode[] = "M";
+    (void) hmode;
 
     s->memmap = picorv32_memmap;
 
     /* Initialize sockets */
-    mmio_irqchip = NULL;
     object_initialize_child(OBJECT(machine), "soc0", &s->soc, TYPE_RISCV_HART_ARRAY);
     object_property_set_uint(OBJECT(&s->soc), "hartid-base", hid, &error_abort);
     object_property_set_uint(OBJECT(&s->soc), "num-harts", num_harts, &error_abort);
@@ -141,8 +120,10 @@ static void picorv32_machine_init(MachineState *machine)
     sysbus_realize(SYS_BUS_DEVICE(&s->soc), &error_fatal);
 
     /* Per-socket interrupt controller */
-    s->irqchip = picorv32_create_plic(s->memmap, 0, hid, num_harts);
-    mmio_irqchip = s->irqchip;
+    s->irqchip = sifive_plic_create(s->memmap[PICORV32_PLIC].base, hmode, num_harts, hid,
+             PICORV32_IRQCHIP_NUM_SOURCES, ((1U << PICORV32_IRQCHIP_NUM_PRIO_BITS) - 1),
+             PICORV32_PLIC_PRIORITY_BASE, PICORV32_PLIC_PENDING_BASE, PICORV32_PLIC_ENABLE_BASE, PICORV32_PLIC_ENABLE_STRIDE,
+             PICORV32_PLIC_CONTEXT_BASE, PICORV32_PLIC_CONTEXT_STRIDE, s->memmap[PICORV32_PLIC].size);
 
     /* Set irq vector address in mtvec */
     picorv32_set_irqvec();
@@ -164,16 +145,15 @@ static void picorv32_machine_init(MachineState *machine)
     s->fw_cfg = create_fw_cfg(machine, s->memmap[PICORV32_FW_CFG].base);
     rom_set_fw(s->fw_cfg);
 
-    create_platform_bus(s, mmio_irqchip);
+    create_platform_bus(s, s->irqchip);
 
     serial_mm_init(system_memory, s->memmap[PICORV32_UART0].base,
-        0, qdev_get_gpio_in(mmio_irqchip, UART0_IRQ), 399193,
+        0, qdev_get_gpio_in(s->irqchip, UART0_IRQ), 399193,
         serial_hd(0), DEVICE_LITTLE_ENDIAN);
 
 
 #define SIMPLE_IRQ_GEN_BASE  0x10001000
 #define SIMPLE_IRQ_GEN_IRQ   16
-
     // Create simple IRQ generator
     DeviceState *irq_gen = qdev_new(TYPE_SIMPLE_IRQ);
     qdev_prop_set_uint32(irq_gen, "default-interval", 2000); // 2 seconds
@@ -181,7 +161,7 @@ static void picorv32_machine_init(MachineState *machine)
     // Map to memory
     sysbus_mmio_map(SYS_BUS_DEVICE(irq_gen), 0, SIMPLE_IRQ_GEN_BASE);
     // Connect to interrupt controller
-    sysbus_connect_irq(SYS_BUS_DEVICE(irq_gen), 0, qdev_get_gpio_in(mmio_irqchip, SIMPLE_IRQ_GEN_IRQ));
+    sysbus_connect_irq(SYS_BUS_DEVICE(irq_gen), 0, qdev_get_gpio_in(s->irqchip, SIMPLE_IRQ_GEN_IRQ));
     printf("Simple IRQ Generator mapped at 0x%08x, IRQ %d\n", SIMPLE_IRQ_GEN_BASE, SIMPLE_IRQ_GEN_IRQ);
 
     ms->fdt = create_device_tree(&s->fdt_size);
