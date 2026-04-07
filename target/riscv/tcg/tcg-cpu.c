@@ -1652,7 +1652,7 @@ static void riscv_init_max_cpu_extensions(Object *obj)
      * image does not have. Disable it for now.
      */
     if (cpu->cfg.ext_smrnmi) {
-        isa_ext_update_enabled(cpu, CPU_CFG_OFFSET(ext_smrnmi), false);
+        isa_ext_update_enabled(cpu, CPU_CFG_OFFSET(ext_smrnmi), true);
     }
 
     /*

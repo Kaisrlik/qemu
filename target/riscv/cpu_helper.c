@@ -474,10 +474,9 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
 
     /* Priority: RNMI > Other interrupt. */
     if (riscv_cpu_cfg(env)->ext_smrnmi) {
-        /* If mnstatus.NMIE == 0, all interrupts are disabled. */
-        if (!get_field(env->mnstatus, MNSTATUS_NMIE)) {
-            return RISCV_EXCP_NONE;
-        }
+
+        if (env->qpr[1] != 0)
+            return -1;
 
         if (env->rnmip) {
             return ctz64(env->rnmip); /* since non-zero */
@@ -554,6 +553,7 @@ bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         int interruptno = riscv_cpu_local_irq_pending(env);
         if (interruptno >= 0) {
             cs->exception_index = RISCV_EXCP_INT_FLAG | interruptno;
+            env->qpr[1] = env->rnmip;
             riscv_cpu_do_interrupt(cs);
             return true;
         }
@@ -2187,8 +2187,9 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     bool nnmi_excep = false;
 
     if (cpu->cfg.ext_smrnmi && env->rnmip && async) {
-        riscv_do_nmi(env, cause | ((target_ulong)1U << (mxlen - 1)),
-                     env->virt_enabled);
+        env->pc = env->mtvec;
+        env->rnmip = 0;
+        env->qpr[0] = last_pc;
         return;
     }
 
