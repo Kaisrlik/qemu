@@ -815,7 +815,7 @@ typedef enum RISCVException {
 #define IRQ_LOCAL_GUEST_MAX                (TARGET_LONG_BITS - 1)
 
 /* RNMI causes */
-#define RNMI_MAX                           16
+#define RNMI_MAX                           32
 
 /* mip masks */
 #define MIP_USIP                           (1 << IRQ_U_SOFT)

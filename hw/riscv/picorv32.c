@@ -168,7 +168,7 @@ static void picorv32_machine_init(MachineState *machine)
     qemu_irq rnmi_irq = qdev_get_gpio_in_named(DEVICE(cs), "riscv.cpu.rnmi", 11);
     serial_mm_init(system_memory, s->memmap[PICORV32_UART0].base, 0, NULL, 115200, serial_hd(0), DEVICE_LITTLE_ENDIAN);
 
-    rnmi_irq = qdev_get_gpio_in_named(DEVICE(cs), "riscv.cpu.rnmi", 12);
+    rnmi_irq = qdev_get_gpio_in_named(DEVICE(cs), "riscv.cpu.rnmi", 30);
     sysbus_connect_irq(SYS_BUS_DEVICE(irq_gen), 0, rnmi_irq);
 #endif
 
