@@ -1,34 +1,10 @@
-{ lib, stdenv, fetchurl, fetchpatch, python3Packages, zlib, pkg-config, glib, buildPackages
-, pixman, vde2, alsa-lib, texinfo, flex
-, bison, lzo, snappy, libaio, libtasn1, gnutls, nettle, curl, dtc, ninja, meson
+{ lib, stdenv, python3Packages, zlib, pkg-config, glib, buildPackages
+, flex , bison, lzo, libaio, libtasn1, gnutls, curl, dtc, ninja, meson
 , makeWrapper, removeReferencesTo
-, attr, libcap, libcap_ng, socat, libslirp
+, attr, libcap, libcap_ng
 , guestAgentSupport ? (with stdenv.hostPlatform; isLinux || isNetBSD || isOpenBSD || isSunOS || isWindows) && !toolsOnly
-, numaSupport ? stdenv.isLinux && !stdenv.isAarch32 && !toolsOnly, numactl
-, seccompSupport ? stdenv.isLinux && !toolsOnly, libseccomp
-, alsaSupport ? lib.hasSuffix "linux" stdenv.hostPlatform.system && !nixosTestRunner && !toolsOnly
-, pulseSupport ? !stdenv.isDarwin && !nixosTestRunner && !toolsOnly, libpulseaudio
-, pipewireSupport ? !stdenv.isDarwin && !nixosTestRunner && !toolsOnly, pipewire
-, sdlSupport ? !stdenv.isDarwin && !nixosTestRunner && !toolsOnly, SDL2, SDL2_image
-, jackSupport ? !stdenv.isDarwin && !nixosTestRunner && !toolsOnly, libjack2
-, gtkSupport ? !stdenv.isDarwin && !xenSupport && !nixosTestRunner && !toolsOnly, gtk3, gettext, vte, wrapGAppsHook3
-, vncSupport ? !nixosTestRunner && !toolsOnly, libjpeg, libpng
-, smartcardSupport ? !nixosTestRunner && !toolsOnly, libcacard
-, spiceSupport ? true && !nixosTestRunner && !toolsOnly, spice, spice-protocol
 , ncursesSupport ? !nixosTestRunner && !toolsOnly, ncurses
-, usbredirSupport ? spiceSupport, usbredir
-, xenSupport ? false, xen
-, cephSupport ? false, ceph
-, glusterfsSupport ? false, glusterfs, libuuid
-, openGLSupport ? sdlSupport, mesa, libepoxy, libdrm
-, rutabagaSupport ? openGLSupport && !toolsOnly && lib.meta.availableOn stdenv.hostPlatform rutabaga_gfx, rutabaga_gfx
-, virglSupport ? openGLSupport, virglrenderer
-, libiscsiSupport ? !toolsOnly, libiscsi
-, smbdSupport ? false, samba
-, tpmSupport ? !toolsOnly
 , uringSupport ? stdenv.isLinux, liburing
-, canokeySupport ? false, canokey-qemu
-, capstoneSupport ? !toolsOnly, capstone
 , enableDocs ? true
 , hostCpuOnly ? false
 , hostCpuTargets ? (if toolsOnly
@@ -41,7 +17,6 @@
 , toolsOnly ? false
 , gitUpdater
 , qemu-utils # for tests attribute
-, xml2Support ? false, libxml2
 , OVMF
 }:
 
@@ -72,7 +47,6 @@ in
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "qemu"
-    + lib.optionalString xenSupport "-xen"
     + lib.optionalString hostCpuOnly "-host-cpu-only"
     + lib.optionalString nixosTestRunner "-for-vm-tests"
     + lib.optionalString toolsOnly "-utils";
@@ -108,39 +82,15 @@ stdenv.mkDerivation (finalAttrs: {
     # Don't change this to python3 and python3.pkgs.*, breaks cross-compilation
     python3Packages.python python3Packages.sphinx python3Packages.sphinx-rtd-theme
   ]
-    ++ lib.optionals gtkSupport [ wrapGAppsHook3 ]
     ++ lib.optionals hexagonSupport [ glib ];
 
-  buildInputs = [ zlib glib pixman
-    vde2 texinfo lzo snappy libtasn1
-    gnutls nettle curl libslirp
+  buildInputs = [ zlib glib
+    lzo libtasn1
+    gnutls curl
   ]
     ++ lib.optionals ncursesSupport [ ncurses ]
-    ++ lib.optionals seccompSupport [ libseccomp ]
-    ++ lib.optionals numaSupport [ numactl ]
-    ++ lib.optionals alsaSupport [ alsa-lib ]
-    ++ lib.optionals pulseSupport [ libpulseaudio ]
-    ++ lib.optionals pipewireSupport [ pipewire ]
-    ++ lib.optionals sdlSupport [ SDL2 SDL2_image ]
-    ++ lib.optionals jackSupport [ libjack2 ]
-    ++ lib.optionals gtkSupport [ gtk3 gettext vte ]
-    ++ lib.optionals vncSupport [ libjpeg libpng ]
-    ++ lib.optionals smartcardSupport [ libcacard ]
-    ++ lib.optionals spiceSupport [ spice-protocol spice ]
-    ++ lib.optionals usbredirSupport [ usbredir ]
     ++ lib.optionals stdenv.isLinux [ libaio libcap_ng libcap attr ]
-    ++ lib.optionals xenSupport [ xen ]
-    ++ lib.optionals cephSupport [ ceph ]
-    ++ lib.optionals glusterfsSupport [ glusterfs libuuid ]
-    ++ lib.optionals openGLSupport [ mesa libepoxy libdrm ]
-    ++ lib.optionals rutabagaSupport [ rutabaga_gfx ]
-    ++ lib.optionals virglSupport [ virglrenderer ]
-    ++ lib.optionals libiscsiSupport [ libiscsi ]
-    ++ lib.optionals smbdSupport [ samba ]
-    ++ lib.optionals uringSupport [ liburing ]
-    ++ lib.optionals canokeySupport [ canokey-qemu ]
-    ++ lib.optionals capstoneSupport [ capstone ]
-    ++ lib.optionals xml2Support [ libxml2 ];
+    ++ lib.optionals uringSupport [ liburing ];
 
   dontUseMesonConfigure = true; # meson's configurePhase isn't compatible with qemu build
 
@@ -173,28 +123,23 @@ stdenv.mkDerivation (finalAttrs: {
     "--enable-tools"
     "--localstatedir=/var"
     "--sysconfdir=/etc"
+    "--disable-strip"
+    "--disable-spice"
+    "--disable-dependency-tracking"
+    "--disable-tools"
+    "--disable-numa"
+    "--disable-sdl"
+    "--disable-slirp"
+    "--disable-alsa"
+    "--disable-pixman"
+    "--disable-oss"
+    "--disable-plugins"
     "--cross-prefix=${stdenv.cc.targetPrefix}"
     (lib.enableFeature guestAgentSupport "guest-agent")
-  ] ++ lib.optional numaSupport "--enable-numa"
-    ++ lib.optional seccompSupport "--enable-seccomp"
-    ++ lib.optional smartcardSupport "--enable-smartcard"
-    ++ lib.optional spiceSupport "--enable-spice"
-    ++ lib.optional usbredirSupport "--enable-usb-redir"
+  ]
     ++ lib.optional (hostCpuTargets != null) "--target-list=${lib.concatStringsSep "," hostCpuTargets}"
-    ++ lib.optionals stdenv.isDarwin [ "--enable-cocoa" "--enable-hvf" ]
     ++ lib.optional stdenv.isLinux "--enable-linux-aio"
-    ++ lib.optional gtkSupport "--enable-gtk"
-    ++ lib.optional xenSupport "--enable-xen"
-    ++ lib.optional cephSupport "--enable-rbd"
-    ++ lib.optional glusterfsSupport "--enable-glusterfs"
-    ++ lib.optional openGLSupport "--enable-opengl"
-    ++ lib.optional virglSupport "--enable-virglrenderer"
-    ++ lib.optional tpmSupport "--enable-tpm"
-    ++ lib.optional libiscsiSupport "--enable-libiscsi"
-    ++ lib.optional smbdSupport "--smbd=${samba}/bin/smbd"
-    ++ lib.optional uringSupport "--enable-linux-io-uring"
-    ++ lib.optional canokeySupport "--enable-canokey"
-    ++ lib.optional capstoneSupport "--enable-capstone";
+    ++ lib.optional uringSupport "--enable-linux-io-uring";
 
   dontWrapGApps = true;
 
@@ -215,7 +160,6 @@ stdenv.mkDerivation (finalAttrs: {
     mv $out/bin/qemu-ga $ga/bin/
     ln -s $ga/bin/qemu-ga $out/bin
     remove-references-to -t $out $ga/bin/qemu-ga
-  '' + lib.optionalString gtkSupport ''
     # wrap GTK Binaries
     for f in $out/bin/qemu-system-*; do
       wrapGApp $f
