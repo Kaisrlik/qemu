@@ -1,0 +1,38 @@
+---
+name: "Release QEMU"
+
+on: workflow_dispatch
+
+jobs:
+  build-and-store-qemu:
+    runs-on: escape-runner
+    container:
+      image: ger-is-registry.caas.intel.com/dssaesc/ubuntu-smoke-nixos:1.0.2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fixup nix.conf pointing into local cache
+        run: |
+          echo "extra-experimental-features = flakes nix-command" > /etc/nix/nix.conf
+          echo "trusted-public-keys = nix-cache.dssaesc.igk.intel.com:Z+oi5yvZU1IZlO08ial9nqH8+93aX3sibxo9Uja5Aug= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" >> /etc/nix/nix.conf
+          echo "trusted-substituters = http://nix-cache.dssaesc.igk.intel.com https://cache.nixos.org" >> /etc/nix/nix.conf
+          echo "trusted-users = root @wheel" >> /etc/nix/nix.conf
+          echo "substituters = http://nix-cache.dssaesc.igk.intel.com https://cache.nixos.org" >> /etc/nix/nix.conf
+          echo "substitute = true   # should be true by default, but I am setting it here to be extra sure" >> /etc/nix/nix.conf
+      - name: Build QEMU
+        run: |
+          orig_ownership=$(ls -nd . | awk '{print $3}')
+          echo "ORIG_OWNERSHIP=$orig_ownership" >> $GITHUB_ENV
+          chown -R $(id -u -n) .
+          nix build --print-build-logs
+      - name: Store artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu_package
+          path: |
+            result/bin/qemu-system-riscv32
+          if-no-files-found: error
+      - name: fix ownership
+        if: always()
+        run: |
+          chown -R "${ORIG_OWNERSHIP}" .
+          ls -la .
