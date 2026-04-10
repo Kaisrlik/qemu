@@ -25,7 +25,15 @@
           bison  lzo  libaio  libtasn1  gnutls  nettle  curl  dtc  ninja
           meson attr  libcap  libcap_ng  socat  numactl
           OVMF.fd
-          python313Packages.distlib
+          (pkgs.python3.withPackages (ps: with ps; [
+            distlib
+            meson
+            pycotap
+            qemu-qmp
+            setuptools
+            pip
+            wheel
+          ]))
         ];
       };
     };

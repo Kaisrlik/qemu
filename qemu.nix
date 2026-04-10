@@ -78,9 +78,13 @@ stdenv.mkDerivation (finalAttrs: {
   nativeBuildInputs = [
     makeWrapper removeReferencesTo
     pkg-config flex bison dtc meson ninja
-
-    # Don't change this to python3 and python3.pkgs.*, breaks cross-compilation
-    python3Packages.python python3Packages.sphinx python3Packages.sphinx-rtd-theme
+    python3Packages.distlib
+    python3Packages.meson
+    python3Packages.pycotap
+    python3Packages.qemu-qmp
+    python3Packages.setuptools
+    python3Packages.pip
+    python3Packages.wheel
   ]
     ++ lib.optionals hexagonSupport [ glib ];
 
@@ -142,63 +146,12 @@ stdenv.mkDerivation (finalAttrs: {
     ++ lib.optional uringSupport "--enable-linux-io-uring";
 
   dontWrapGApps = true;
-
-  # QEMU attaches entitlements with codesign and strip removes those,
-  # voiding the entitlements and making it non-operational.
-  # The alternative is to re-sign with entitlements after stripping:
-  # * https://github.com/qemu/qemu/blob/v6.1.0/scripts/entitlement.sh#L25
-  dontStrip = stdenv.isDarwin;
-
-  postFixup = ''
-    # the .desktop is both invalid and pointless
-    rm -f $out/share/applications/qemu.desktop
-    wrapProgram $out/bin/qemu-system-x86_64 \
-      --add-flags "-bios ${OVMF.fd}/FV/OVMF.fd"
-  '' + lib.optionalString guestAgentSupport ''
-    # move qemu-ga (guest agent) to separate output
-    mkdir -p $ga/bin
-    mv $out/bin/qemu-ga $ga/bin/
-    ln -s $ga/bin/qemu-ga $out/bin
-    remove-references-to -t $out $ga/bin/qemu-ga
-    # wrap GTK Binaries
-    for f in $out/bin/qemu-system-*; do
-      wrapGApp $f
-    done
-  '';
   preBuild = "cd build";
 
-  # Add a ‘qemu-kvm’ wrapper for compatibility/convenience.
   postInstall = lib.optionalString (!toolsOnly) ''
-    ln -s $out/bin/qemu-system-${stdenv.hostPlatform.qemuArch} $out/bin/qemu-kvm
-    install -m 755 ${srcs.qemu}/escape-run.sh $out/bin/escape-run.sh
+    rm -f $out/bin/qemu-kvm
   '';
-
-  passthru = {
-    qemu-system-i386 = "bin/qemu-system-i386";
-    tests = lib.optionalAttrs (!toolsOnly) {
-      qemu-tests = finalAttrs.finalPackage.overrideAttrs (_: { doCheck = true; });
-      qemu-utils-builds = qemu-utils;
-    };
-    updateScript = gitUpdater {
-      # No nicer place to find latest release.
-      url = "https://gitlab.com/qemu-project/qemu.git";
-      rev-prefix = "v";
-      ignoredVersions = "(alpha|beta|rc).*";
-    };
-  };
 
   # Builds in ~3h with 2 cores, and ~20m with a big-parallel builder.
   requiredSystemFeatures = [ "big-parallel" ];
-
-  meta = with lib; {
-    homepage = "https://www.qemu.org/";
-    description = "A generic and open source machine emulator and virtualizer";
-    license = licenses.gpl2Plus;
-    maintainers = with maintainers; [ eelco qyliss ];
-    platforms = platforms.unix;
-  }
-  # toolsOnly: Does not have qemu-kvm and there's no main support tool
-  // lib.optionalAttrs (!toolsOnly) {
-    mainProgram = "qemu-kvm";
-  };
 })
