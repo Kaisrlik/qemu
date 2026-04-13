@@ -41,7 +41,7 @@
 static TCGv cpu_gpr[32], cpu_gprh[32], cpu_pc, cpu_vl, cpu_vstart;
 static TCGv_i64 cpu_fpr[32]; /* assume F and D extensions */
 // pico32rv registers
-static TCGv cpu_qpr[4], cpu_timer, cpu_irq_mask;
+static TCGv cpu_qpr[4], cpu_irq_mask;
 static TCGv load_res;
 static TCGv load_val;
 
@@ -1334,9 +1334,7 @@ static bool trans_timer(DisasContext *ctx, arg_timer *a)
 {
     TCGv src = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv dest = get_gpr(ctx, a->rd, EXT_NONE);
-    TCGv timer = cpu_timer;
-    tcg_gen_mov_tl(dest, timer);
-    tcg_gen_mov_tl(timer, src);
+    gen_helper_picorv_timer(dest, tcg_env, src);
     return true;
 }
 
@@ -1585,8 +1583,7 @@ void riscv_translate_init(void)
     for (i = 0; i < 4; i++) {
         cpu_qpr[i] = tcg_global_mem_new(tcg_env, offsetof(CPURISCVState, qpr[i]), riscv_qpr_regnames[i]);
     }
-    cpu_timer = tcg_global_mem_new(tcg_env, offsetof(CPURISCVState, timer), riscv_picorv_regnames[i]);
-    cpu_irq_mask = tcg_global_mem_new(tcg_env, offsetof(CPURISCVState, irq_mask), riscv_picorv_regnames[i]);
+    cpu_irq_mask = tcg_global_mem_new(tcg_env, offsetof(CPURISCVState, irq_mask), riscv_picorv_regnames[1]);
 
     cpu_pc = tcg_global_mem_new(tcg_env, offsetof(CPURISCVState, pc), "pc");
     cpu_vl = tcg_global_mem_new(tcg_env, offsetof(CPURISCVState, vl), "vl");

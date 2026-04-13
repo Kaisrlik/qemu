@@ -27,5 +27,8 @@ void riscv_timer_write_timecmp(CPURISCVState *env, QEMUTimer *timer,
                                uint32_t timer_irq);
 void riscv_timer_stce_changed(CPURISCVState *env, bool is_m_mode, bool enable);
 void riscv_timer_init(RISCVCPU *cpu);
+void riscv_picorv_timer_init(RISCVCPU *cpu);
+uint32_t riscv_picorv_timer_get(CPURISCVState *env);
+void riscv_picorv_timer_set(CPURISCVState *env, uint32_t value);
 
 #endif

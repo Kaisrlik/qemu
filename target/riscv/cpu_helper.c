@@ -474,11 +474,8 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
 
     /* Priority: RNMI > Other interrupt. */
     if (riscv_cpu_cfg(env)->ext_smrnmi) {
-        if (env->qpr[1] != 0)
-            return -1;
-
-        if (env->rnmip) {
-            return ctz64(env->rnmip); /* since non-zero */
+        if (env->rnmip & (~env->irq_mask)) {
+            return ctz64(env->rnmip & (~env->irq_mask)); /* since non-zero */
         }
     }
 
@@ -552,7 +549,6 @@ bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         int interruptno = riscv_cpu_local_irq_pending(env);
         if (interruptno >= 0) {
             cs->exception_index = RISCV_EXCP_INT_FLAG | interruptno;
-            env->qpr[1] = env->rnmip;
             riscv_cpu_do_interrupt(cs);
             return true;
         }
@@ -2187,6 +2183,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
 
     if (cpu->cfg.ext_smrnmi && env->rnmip && async) {
         env->pc = env->mtvec;
+        env->qpr[1] = env->rnmip;
         env->rnmip = 0;
         env->qpr[0] = last_pc;
         return;

@@ -21,6 +21,7 @@
 #include "cpu_bits.h"
 #include "time_helper.h"
 #include "hw/intc/riscv_aclint.h"
+#include "hw/riscv/picorv32.h"
 
 static void riscv_vstimer_cb(void *opaque)
 {
@@ -34,6 +35,14 @@ static void riscv_stimer_cb(void *opaque)
 {
     RISCVCPU *cpu = opaque;
     riscv_cpu_update_mip(&cpu->env, MIP_STIP, BOOL_TO_MASK(1));
+}
+
+static void riscv_picorvtimer_cb(void *opaque)
+{
+    RISCVCPU *cpu = opaque;
+    qemu_log("PicoRV Timer callback - generating interrupt\n");
+
+    riscv_cpu_set_rnmi(cpu, PICORV_IRQ_TIMER, 1);
 }
 
 /*
@@ -200,4 +209,39 @@ void riscv_timer_init(RISCVCPU *cpu)
 
     env->vstimer = timer_new_ns(QEMU_CLOCK_VIRTUAL, &riscv_vstimer_cb, cpu);
     env->vstimecmp = 0;
+}
+
+uint32_t riscv_picorv_timer_get(CPURISCVState *env) {
+
+    uint32_t result = 0;
+    uint64_t current_expire_time = timer_expire_time_ns(env->picorv_timer);
+    uint64_t current_time = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
+
+    if((current_expire_time != -1) && (current_time < current_expire_time)){
+        result = (current_expire_time - current_time) / 10; //Convert to 100Mhz ticks
+    }
+
+    return result;
+}
+
+void riscv_picorv_timer_set(CPURISCVState *env, uint32_t value) {
+    uint64_t new_expire_time;
+    uint64_t value_in_ns = (uint64_t)value * 10; //Convert to ns
+    if (value != 0) {
+        new_expire_time = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + value_in_ns;
+        timer_mod(env->picorv_timer, new_expire_time);
+    } else {
+        timer_del(env->picorv_timer); //Disable timer
+    }
+}
+
+void riscv_picorv_timer_init(RISCVCPU *cpu){
+    CPURISCVState *env;
+
+    if (!cpu) {
+        return;
+    }
+
+    env = &cpu->env;
+    env->picorv_timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, &riscv_picorvtimer_cb, cpu);
 }

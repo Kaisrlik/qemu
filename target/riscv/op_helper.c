@@ -19,8 +19,10 @@
  */
 
 #include "qemu/osdep.h"
+#include "qemu/timer.h"
 #include "cpu.h"
 #include "internals.h"
+#include "time_helper.h"
 #include "exec/cputlb.h"
 #include "accel/tcg/cpu-ldst.h"
 #include "accel/tcg/probe.h"
@@ -797,6 +799,13 @@ void helper_ssamoswap_disabled(CPURISCVState *env)
 
 done:
     riscv_raise_exception(env, exception, GETPC());
+}
+
+target_ulong helper_picorv_timer(CPUArchState *env, target_ulong rs1_val)
+{
+    target_ulong result = riscv_picorv_timer_get(env);
+    riscv_picorv_timer_set(env, rs1_val);
+    return result;
 }
 
 #endif /* !CONFIG_USER_ONLY */

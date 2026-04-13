@@ -20,6 +20,7 @@
 #include "exec/gdbstub.h"
 #include "gdbstub/helpers.h"
 #include "cpu.h"
+#include "time_helper.h"
 
 struct TypeSize {
     const char *gdb_type;
@@ -116,7 +117,7 @@ static int riscv_gdb_get_qpr(CPUState *cs, GByteArray *buf, int n)
     if (n < 4)
         return gdb_get_reg32(buf, env->qpr[n]);
     if (n == 4)
-        return gdb_get_reg32(buf, env->timer);
+        return gdb_get_reg32(buf, riscv_picorv_timer_get(env));
     if (n == 5)
         return gdb_get_reg32(buf, env->irq_mask);
     return 0;
@@ -132,7 +133,7 @@ static int riscv_gdb_set_qpr(CPUState *cs, uint8_t *mem_buf, int n)
         return sizeof(target_ulong);
     }
     if (n == 4) {
-        env->timer = ldl_p(mem_buf);
+        riscv_picorv_timer_set(env, ldl_p(mem_buf));
         return sizeof(target_ulong);
     }
     if (n == 5) {

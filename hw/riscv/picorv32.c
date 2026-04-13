@@ -14,28 +14,14 @@
 #include "system/device_tree.h"
 #include "system/system.h"
 
-// Devices
-#include "hw/misc/simple_irq_gen.h"
-
 #define log(fmt, ...) qemu_log_mask(LOG_GUEST_ERROR, "%s: " fmt, __func__, ##__VA_ARGS__)
 
 
 static const MemMapEntry picorv32_memmap[] = {
-    [PICORV32_DRAM] =         {        0x0,     0x1000000 },
-    [PICORV32_MROM] =         {  0x1000000,        0xf000 },
+    [PICORV32_SRAM] = { 0x0, 0x00200000},
     [PICORV32_PLATFORM_BUS] = {  0x4000000,     0x2000000 },
-    [PICORV32_APLIC_M] =      {  0xd000000, APLIC_SIZE(2) },
     [PICORV32_UART0] =        { 0x10000000,         0x100 },
-    [PICORV32_FW_CFG] =       { 0x10100000,          0x18 },
 };
-
-static FWCfgState *create_fw_cfg(const MachineState *ms, hwaddr base)
-{
-    FWCfgState *fw_cfg;
-    fw_cfg = fw_cfg_init_mem_dma(base + 8, base, 8, base + 16, &address_space_memory);
-    fw_cfg_add_i16(fw_cfg, FW_CFG_NB_CPUS, (uint16_t)ms->smp.cpus);
-    return fw_cfg;
-}
 
 static void __attribute__((unused)) create_platform_bus(RISCVPicorv32State *s, DeviceState *irqchip)
 {
@@ -67,28 +53,14 @@ static void picorv32_machine_done(Notifier *notifier, void *data)
     RISCVPicorv32State *s = container_of(notifier, RISCVPicorv32State,
                                      machine_done);
     MachineState *machine = MACHINE(s);
-    hwaddr start_addr = s->memmap[PICORV32_DRAM].base;
-    hwaddr firmware_end_addr;
-    vaddr kernel_start_addr;
-    const char *firmware_name = riscv_default_firmware_name(&s->soc);
-    uint64_t fdt_load_addr;
+    hwaddr start_addr = s->memmap[PICORV32_SRAM].base;
     uint64_t kernel_entry = 0;
     RISCVBootInfo boot_info;
 
-    firmware_end_addr = riscv_find_and_load_firmware(machine, firmware_name, &start_addr, NULL);
-
     riscv_boot_info_init(&boot_info, &s->soc);
-
-    if (machine->kernel_filename && !kernel_entry) {
-        kernel_start_addr = riscv_calc_kernel_start_addr(&boot_info, firmware_end_addr);
-        riscv_load_kernel(machine, &boot_info, kernel_start_addr, true, NULL);
-        kernel_entry = boot_info.image_low_addr;
-    }
-
-    fdt_load_addr = riscv_compute_fdt_addr(s->memmap[PICORV32_DRAM].base, s->memmap[PICORV32_DRAM].size, machine, &boot_info);
-    /* load the reset vector */
-    riscv_setup_rom_reset_vec(machine, &s->soc, start_addr, s->memmap[PICORV32_MROM].base, s->memmap[PICORV32_MROM].size, kernel_entry, fdt_load_addr);
-    riscv_setup_direct_kernel(kernel_entry, fdt_load_addr);
+    riscv_load_kernel(machine, &boot_info, start_addr, true, NULL);
+    kernel_entry = boot_info.image_low_addr;
+    riscv_setup_direct_kernel(kernel_entry, 0);
 }
 
 static void picorv32_set_irqvec(void)
@@ -103,7 +75,6 @@ static void picorv32_machine_init(MachineState *machine)
     RISCVPicorv32State *s = RISCV_PICORV32_MACHINE(machine);
     MachineState *ms = MACHINE(s);
     MemoryRegion *system_memory = get_system_memory();
-    MemoryRegion *mask_rom = g_new(MemoryRegion, 1);
     uint32_t hid = 0, num_harts = 1;
     char hmode[] = "M";
     (void) hmode;
@@ -115,7 +86,7 @@ static void picorv32_machine_init(MachineState *machine)
     object_property_set_uint(OBJECT(&s->soc), "hartid-base", hid, &error_abort);
     object_property_set_uint(OBJECT(&s->soc), "num-harts", num_harts, &error_abort);
     object_property_set_str(OBJECT(&s->soc), "cpu-type", machine->cpu_type, &error_abort);
-    object_property_set_uint(OBJECT(&s->soc), "resetvec", s->memmap[PICORV32_MROM].base, &error_abort);
+    object_property_set_uint(OBJECT(&s->soc), "resetvec", s->memmap[PICORV32_SRAM].base, &error_abort);
 
     sysbus_realize(SYS_BUS_DEVICE(&s->soc), &error_fatal);
 
@@ -123,54 +94,10 @@ static void picorv32_machine_init(MachineState *machine)
     picorv32_set_irqvec();
 
     /* register system main memory (actual RAM) */
-    memory_region_add_subregion(system_memory, s->memmap[PICORV32_DRAM].base,
+    memory_region_add_subregion(system_memory, s->memmap[PICORV32_SRAM].base,
                                 machine->ram);
-
-    /* boot rom */
-    memory_region_init_rom(mask_rom, NULL, "riscv_picorv32_board.mrom",
-                           s->memmap[PICORV32_MROM].size, &error_fatal);
-    memory_region_add_subregion(system_memory, s->memmap[PICORV32_MROM].base,
-                                mask_rom);
-
-    /*
-     * Init fw_cfg. Must be done before riscv_load_fdt, otherwise the
-     * device tree cannot be altered and we get FDT_ERR_NOSPACE.
-     */
-    s->fw_cfg = create_fw_cfg(machine, s->memmap[PICORV32_FW_CFG].base);
-    rom_set_fw(s->fw_cfg);
-
-#define SIMPLE_IRQ_GEN_BASE  0x10001000
-#define SIMPLE_IRQ_GEN_IRQ   16
-    // Create simple IRQ generator
-    DeviceState *irq_gen = qdev_new(TYPE_SIMPLE_IRQ);
-    qdev_prop_set_uint32(irq_gen, "default-interval", 2000); // 2 seconds
-    sysbus_realize_and_unref(SYS_BUS_DEVICE(irq_gen), &error_fatal);
-    // Map to memory
-    sysbus_mmio_map(SYS_BUS_DEVICE(irq_gen), 0, SIMPLE_IRQ_GEN_BASE);
-    // Connect to interrupt controller
-
-    // PLIC vs. RNMI interrupt controller
-#if 0
-    /* Per-socket interrupt controller */
-    s->irqchip = riscv_aplic_create(s->memmap[PICORV32_APLIC_M].base,
-            s->memmap[PICORV32_APLIC_M].size, hid, num_harts,
-            PICORV32_IRQCHIP_NUM_SOURCES, PICORV32_IRQCHIP_NUM_PRIO_BITS, true,
-            true, NULL);
-    create_platform_bus(s, s->irqchip);
-
-    serial_mm_init(system_memory, s->memmap[PICORV32_UART0].base,
-        0, qdev_get_gpio_in(s->irqchip, UART0_IRQ), 399193,
-        serial_hd(0), DEVICE_LITTLE_ENDIAN);
-
-    sysbus_connect_irq(SYS_BUS_DEVICE(irq_gen), 0, qdev_get_gpio_in(s->irqchip, SIMPLE_IRQ_GEN_IRQ));
-#else
-    CPUState *cs = qemu_get_cpu(0);
-    qemu_irq rnmi_irq = qdev_get_gpio_in_named(DEVICE(cs), "riscv.cpu.rnmi", 11);
+    s->fw_cfg = NULL;
     serial_mm_init(system_memory, s->memmap[PICORV32_UART0].base, 0, NULL, 115200, serial_hd(0), DEVICE_LITTLE_ENDIAN);
-
-    rnmi_irq = qdev_get_gpio_in_named(DEVICE(cs), "riscv.cpu.rnmi", 30);
-    sysbus_connect_irq(SYS_BUS_DEVICE(irq_gen), 0, rnmi_irq);
-#endif
 
     ms->fdt = create_device_tree(&s->fdt_size);
 

@@ -24,20 +24,17 @@ struct RISCVPicorv32State {
 };
 
 enum {
+    PICORV32_SRAM,
     PICORV32_MROM,
     PICORV32_RTC,
-    PICORV32_APLIC_M,
     PICORV32_UART0,
-    PICORV32_FW_CFG,
-    PICORV32_DRAM,
     PICORV32_PLATFORM_BUS,
 };
 
-enum {
-    UART0_IRQ = 10,
-    RTC_IRQ = 11,
-    VIRTIO_IRQ = 1, /* 1 to 8 */
-    VIRTIO_COUNT = 8,
+enum interrupt {
+	PICORV_IRQ_TIMER = 0,
+	PICORV_IRQ_EBREAK_ECALL = 1,
+	PICORV_IRQ_BUS_ERROR = 2,
     PICORV32_PLATFORM_BUS_IRQ = 64, /* 64 to 95 */
 };
 
