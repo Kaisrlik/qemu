@@ -18,12 +18,9 @@
 
       devShells.x86_64-linux.default = pkgs.mkShell {
         packages = with pkgs; [
-          zlib
-          pkg-config
-          glib
-          pixman flex
-          bison  lzo  libaio  libtasn1  gnutls  nettle  curl  dtc  ninja
-          meson attr  libcap  libcap_ng  socat  numactl
+          zlib pkg-config glib flex
+          bison libaio curl ninja dtc
+          meson attr socat
           OVMF.fd
           (pkgs.python3.withPackages (ps: with ps; [
             distlib

@@ -89,8 +89,7 @@ stdenv.mkDerivation (finalAttrs: {
     ++ lib.optionals hexagonSupport [ glib ];
 
   buildInputs = [ zlib glib
-    lzo libtasn1
-    gnutls curl
+    lzo libtasn1 curl
   ]
     ++ lib.optionals ncursesSupport [ ncurses ]
     ++ lib.optionals stdenv.isLinux [ libaio libcap_ng libcap attr ]
