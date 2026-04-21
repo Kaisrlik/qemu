@@ -11,4 +11,6 @@
   <reg name="q1" bitsize="32" type="ieee_single"/>
   <reg name="q2" bitsize="32" type="ieee_single"/>
   <reg name="q3" bitsize="32" type="ieee_single"/>
+  <reg name="tim0" bitsize="32" type="ieee_single"/>
+  <reg name="imsk" bitsize="32" type="ieee_single"/>
 </feature>

@@ -113,8 +113,12 @@ static int riscv_gdb_get_qpr(CPUState *cs, GByteArray *buf, int n)
     RISCVCPU *cpu = RISCV_CPU(cs);
     CPURISCVState *env = &cpu->env;
 
-    if (n < 32)
+    if (n < 4)
         return gdb_get_reg32(buf, env->qpr[n]);
+    if (n == 4)
+        return gdb_get_reg32(buf, env->timer);
+    if (n == 5)
+        return gdb_get_reg32(buf, env->irq_mask);
     return 0;
 }
 
@@ -123,8 +127,16 @@ static int riscv_gdb_set_qpr(CPUState *cs, uint8_t *mem_buf, int n)
     RISCVCPU *cpu = RISCV_CPU(cs);
     CPURISCVState *env = &cpu->env;
 
-    if (n < 32) {
+    if (n < 4) {
         env->qpr[n] = ldl_p(mem_buf);
+        return sizeof(target_ulong);
+    }
+    if (n == 4) {
+        env->timer = ldl_p(mem_buf);
+        return sizeof(target_ulong);
+    }
+    if (n == 5) {
+        env->irq_mask = ldl_p(mem_buf);
         return sizeof(target_ulong);
     }
     return 0;

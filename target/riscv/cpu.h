@@ -218,6 +218,8 @@ struct CPUArchState {
 
     /* picorv32 irq registers */
     target_ulong qpr[4];
+    target_ulong timer;
+    target_ulong irq_mask;
 
     /* vector coprocessor state. */
     uint64_t vreg[32 * RV_VLEN_MAX / 64] QEMU_ALIGNED(16);
@@ -591,6 +593,7 @@ extern const char * const riscv_int_regnames[];
 extern const char * const riscv_int_regnamesh[];
 extern const char * const riscv_fpr_regnames[];
 extern const char * const riscv_qpr_regnames[];
+extern const char * const riscv_picorv_regnames[];
 extern const char * const riscv_rvv_regnames[];
 
 const char *riscv_cpu_get_trap_name(target_ulong cause, bool async);

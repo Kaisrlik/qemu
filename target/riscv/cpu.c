@@ -313,6 +313,10 @@ const char * const riscv_qpr_regnames[] = {
     "q0/qt0",   "q1/qt1",  "q2/qt2",   "q3/qt3"
 };
 
+const char * const riscv_picorv_regnames[] = {
+    "tim0",   "imsk"
+};
+
 const char * const riscv_fpr_regnames[] = {
     "f0/ft0",   "f1/ft1",  "f2/ft2",   "f3/ft3",   "f4/ft4",  "f5/ft5",
     "f6/ft6",   "f7/ft7",  "f8/fs0",   "f9/fs1",   "f10/fa0", "f11/fa1",
