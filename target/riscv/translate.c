@@ -1287,6 +1287,14 @@ static bool trans_retirq(DisasContext *ctx, arg_retirq *a)
 // old value.
 static bool trans_maskirq(DisasContext *ctx, arg_maskirq *a)
 {
+    TCGv src = get_gpr(ctx, a->rs1, EXT_NONE);
+    TCGv dest = dest_gpr(ctx, a->rd);
+    TCGv temp = tcg_temp_new();
+
+    tcg_gen_mov_tl(temp, cpu_irq_mask);
+    tcg_gen_mov_tl(cpu_irq_mask, src);
+    tcg_gen_mov_tl(dest, temp);
+
     return true;
 }
 

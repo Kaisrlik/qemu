@@ -474,7 +474,6 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
 
     /* Priority: RNMI > Other interrupt. */
     if (riscv_cpu_cfg(env)->ext_smrnmi) {
-
         if (env->qpr[1] != 0)
             return -1;
 
