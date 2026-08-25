@@ -141,6 +141,7 @@ DEF_HELPER_4(ctr_add_entry, void, env, tl, tl, tl)
 /* Native Debug */
 DEF_HELPER_1(itrigger_match, void, env)
 #endif
+DEF_HELPER_2(waitirq, tl, env, tl)
 
 /* Hypervisor functions */
 #ifndef CONFIG_USER_ONLY

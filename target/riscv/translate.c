@@ -1302,6 +1302,12 @@ static bool trans_maskirq(DisasContext *ctx, arg_maskirq *a)
 // IRQs is written to rd.
 static bool trans_waitirq(DisasContext *ctx, arg_waitirq *a)
 {
+    TCGv dest = get_gpr(ctx, a->rd, EXT_NONE);
+    TCGv zero = ctx->zero;
+
+    decode_save_opc(ctx, 0);
+    gen_update_pc(ctx, ctx->cur_insn_len);
+    gen_helper_waitirq(dest, tcg_env, zero);
     return true;
 }
 

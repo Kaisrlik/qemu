@@ -558,6 +558,25 @@ void helper_wfi(CPURISCVState *env)
     }
 }
 
+target_ulong helper_waitirq(CPURISCVState *env, target_ulong rd_val)
+{
+    CPUState *cs = env_cpu(env);
+    target_ulong pending;
+
+    // Get pending interrupt bitmask
+    pending = riscv_cpu_all_pending(env);
+
+    // If no interrupts are pending, halt the CPU until one arrives
+    if (pending == 0) {
+        cs->halted = 1;
+        cs->exception_index = EXCP_HLT;
+        cpu_loop_exit(cs);
+    }
+
+    // Return the bitmask of pending interrupts
+    return pending;
+}
+
 void helper_wrs_nto(CPURISCVState *env)
 {
     if (env->virt_enabled && (env->priv == PRV_S || env->priv == PRV_U) &&
